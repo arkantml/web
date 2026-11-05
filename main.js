@@ -1,44 +1,10 @@
 const DATA = /*D*/ {
   judul: "Repositori Dokumentasi",
-  deskripsi:
-    "Kumpulan album foto dan video kegiatan. Pilih album untuk membukanya di Google Drive.",
-  items: [
-    {
-      id: "c1",
-      judul: "Dokumentasi Kegiatan A",
-      link: "https://drive.google.com/",
-      kategori: "Kegiatan",
-      tanggal: "2026-10-12",
-      tipe: "foto",
-      jumlah: "±250 foto",
-      deskripsi: "Contoh data. Ganti lewat mode Kelola.",
-      contoh: true,
-    },
-    {
-      id: "c2",
-      judul: "Rekaman Acara B",
-      link: "https://drive.google.com/",
-      kategori: "Acara",
-      tanggal: "2026-09-03",
-      tipe: "video",
-      jumlah: "12 video",
-      deskripsi: "Contoh data. Ganti lewat mode Kelola.",
-      contoh: true,
-    },
-    {
-      id: "c3",
-      judul: "Arsip Lomba C",
-      link: "https://drive.google.com/",
-      kategori: "Lomba",
-      tanggal: "2026-08-17",
-      tipe: "campuran",
-      jumlah: "±400 berkas",
-      deskripsi: "Contoh data. Ganti lewat mode Kelola.",
-      contoh: true,
-    },
-  ],
+  deskripsi: "Kumpulan album foto dan video kegiatan.",
+  items: [],
 }; /*E*/
-const SRC = document.currentScript.textContent;
+const SUPABASE_CONFIG = /*C*/ { url: "", anonKey: "" }; /*CE*/
+const SRC = document.currentScript?.textContent || "";
 (() => {
   const $ = (s) => document.querySelector(s);
   const TIPE = {
@@ -54,6 +20,8 @@ const SRC = document.currentScript.textContent;
   const FONT =
     "https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Public+Sans:wght@400;600&display=swap";
   const data = JSON.parse(JSON.stringify(DATA));
+  let supabaseConfig = SUPABASE_CONFIG,
+    loadMessage = "Memuat album dari Supabase…";
   let q = "",
     kat = "",
     tip = "",
@@ -153,13 +121,38 @@ const SRC = document.currentScript.textContent;
   }
 
   /* ---- membangun dokumen lengkap untuk diterbitkan (template dari state, bukan salinan DOM) ---- */
-  function doc() {
-    const js = SRC.replace(
+  async function doc() {
+    let source = SRC;
+    if (!source) {
+      const script = document.querySelector('script[src*="main.js"]');
+      if (!script) throw new Error("Cannot find main.js to publish.");
+      const response = await fetch(script.src);
+      if (!response.ok) throw new Error("Cannot load main.js to publish.");
+      source = await response.text();
+    }
+    let css = $("#css")?.textContent;
+    if (css == null) {
+      const stylesheet = document.querySelector('link[href*="style.css"]');
+      if (!stylesheet) throw new Error("Cannot find style.css to publish.");
+      const response = await fetch(stylesheet.href);
+      if (!response.ok) throw new Error("Cannot load style.css to publish.");
+      css = await response.text();
+    }
+    let js = source.replace(
       /\/\*D\*\/[\s\S]*?\/\*E\*\//,
       () =>
         "/*D*/" +
         JSON.stringify(data).replace(/</g, "\\u003c").replace(/\*\//g, "*\\/") +
         "/*E*/",
+    );
+    js = js.replace(
+      /\/\*C\*\/[\s\S]*?\/\*CE\*\//,
+      () =>
+        "/*C*/" +
+        JSON.stringify(supabaseConfig)
+          .replace(/</g, "\\u003c")
+          .replace(/\*\//g, "*\\/") +
+        "/*CE*/",
     );
     return (
       '<!doctype html>\n<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>' +
@@ -167,7 +160,7 @@ const SRC = document.currentScript.textContent;
       '</title><link rel="stylesheet" href="' +
       FONT +
       '"><style id="css">' +
-      $("#css").textContent +
+      css +
       '</style></head><body><div class="strip" aria-hidden="true"></div><main id="app"></main><div id="toast" role="status" aria-live="polite"></div><script>' +
       js +
       "<\/script></body></html>"
@@ -175,7 +168,7 @@ const SRC = document.currentScript.textContent;
   }
   async function pub() {
     try {
-      await art.publish(doc());
+      await art.publish(await doc());
       dirty = false;
       toast("Diterbitkan. Halaman dimuat ulang…");
     } catch (e) {
@@ -224,7 +217,7 @@ const SRC = document.currentScript.textContent;
           href: i.link,
           target: "_blank",
           rel: "noopener noreferrer",
-          text: "Buka di Drive",
+          text: "Buka album",
         }),
         h("button", {
           type: "button",
@@ -265,9 +258,9 @@ const SRC = document.currentScript.textContent;
       g.append(
         h("div", {
           class: "empty",
-          text: canEdit
-            ? "Belum ada album. Buka Kelola untuk menambahkan link Drive pertamamu."
-            : "Belum ada album yang dipublikasikan.",
+          text: loadMessage || (canEdit
+            ? "Belum ada album. Buka Kelola untuk menambahkan album pertamamu."
+            : "Belum ada album yang dipublikasikan."),
         }),
       );
     else if (!L.length)
@@ -312,7 +305,7 @@ const SRC = document.currentScript.textContent;
         type: "url",
         maxlength: 500,
         required: true,
-        placeholder: "https://drive.google.com/drive/folders/…",
+        placeholder: "https://…",
       }),
       k = h("input", {
         maxlength: 40,
@@ -380,7 +373,7 @@ const SRC = document.currentScript.textContent;
         },
       },
       fld("Judul album", j),
-      fld("Link Google Drive", l),
+      fld("Tautan album", l),
       h("div", { class: "two" }, fld("Kategori", k), fld("Tanggal", t)),
       h(
         "div",
@@ -421,7 +414,7 @@ const SRC = document.currentScript.textContent;
     const bx = h("textarea", {
       rows: 6,
       placeholder:
-        "Satu album per baris:\nJudul | https://link-drive | Kategori | 2026-10-12 | foto\n(kategori, tanggal, dan jenis [foto/video/campuran] boleh dikosongkan)",
+        "Satu album per baris:\nJudul | https://tautan-album | Kategori | 2026-10-12 | foto\n(kategori, tanggal, dan jenis [foto/video/campuran] boleh dikosongkan)",
       maxlength: 60000,
     });
     const fB = h(
@@ -550,7 +543,7 @@ const SRC = document.currentScript.textContent;
   }
   function drawPub() {
     const b = $("#pub");
-    b.hidden = !(canEdit && manage);
+    b.hidden = !(canEdit && manage && !supabaseConfig.url);
     if (b.hidden) return;
     b.replaceChildren(
       h("span", {
@@ -571,7 +564,7 @@ const SRC = document.currentScript.textContent;
     $("#jd").textContent = data.judul;
     $("#ds").textContent = data.deskripsi;
     document.title = data.judul;
-    $("#km").hidden = !canEdit;
+    $("#km").hidden = !canEdit || Boolean(supabaseConfig.url);
     $("#km").textContent = manage ? "Tutup Kelola" : "Kelola";
     drawList();
     drawManage();
@@ -664,6 +657,81 @@ const SRC = document.currentScript.textContent;
     }
   });
   draw();
+  async function loadSupabase() {
+    try {
+      if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+        const response = await fetch("supabase-config.json", {
+          cache: "no-store",
+        });
+        if (!response.ok)
+          throw new Error(
+            "supabase-config.json тохиргооны файлыг уншиж чадсангүй.",
+          );
+        const config = await response.json();
+        if (!config || typeof config !== "object" || Array.isArray(config))
+          throw new Error("supabase-config.json бүтэц буруу байна.");
+        supabaseConfig = { ...SUPABASE_CONFIG, ...config };
+      }
+      const baseUrl = String(supabaseConfig.url || "")
+        .trim()
+        .replace(/\/+$/, "");
+      const anonKey = String(supabaseConfig.anonKey || "").trim();
+      if (!baseUrl || !anonKey)
+        throw new Error(
+          "Isi Project URL dan anon key Supabase di supabase-config.json.",
+        );
+      const url = new URL(baseUrl);
+      if (url.protocol !== "https:")
+        throw new Error("Supabase Project URL harus menggunakan HTTPS.");
+      const endpoint = new URL("/rest/v1/albums", url);
+      endpoint.search = new URLSearchParams({
+        select: "id,judul,link,kategori,tanggal,tipe,jumlah,deskripsi",
+        order: "tanggal.desc.nullslast",
+      });
+      const response = await fetch(endpoint, {
+        headers: {
+          apikey: anonKey,
+          Authorization: "Bearer " + anonKey,
+          Accept: "application/json",
+        },
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(
+          result.message || result.msg || "Supabase gagal mengirim data album.",
+        );
+      if (!Array.isArray(result))
+        throw new Error("Supabase mengembalikan format data yang tidak valid.");
+      data.items = result.map((album, index) => {
+        if (
+          !album ||
+          typeof album.judul !== "string" ||
+          typeof album.link !== "string" ||
+          !okLink(album.link) ||
+          !["foto", "video", "campuran"].includes(album.tipe)
+        )
+          throw new Error(
+            `Data album nomor ${index + 1} tidak valid. Periksa tabel albums.`,
+          );
+        return {
+          id: String(album.id || index),
+          judul: album.judul,
+          link: album.link,
+          kategori: String(album.kategori || ""),
+          tanggal: okDate(String(album.tanggal || "")),
+          tipe: album.tipe,
+          jumlah: String(album.jumlah || ""),
+          deskripsi: String(album.deskripsi || ""),
+        };
+      });
+      loadMessage = data.items.length
+        ? ""
+        : "Belum ada album di tabel Supabase.";
+    } catch (e) {
+      loadMessage = e.message || "Tidak dapat memuat album dari Supabase.";
+    }
+    draw();
+  }
   (async () => {
     const use =
       window.claude && window.claude.use
@@ -677,5 +745,6 @@ const SRC = document.currentScript.textContent;
       canEdit = false;
     }
     draw();
+    await loadSupabase();
   })();
 })();
